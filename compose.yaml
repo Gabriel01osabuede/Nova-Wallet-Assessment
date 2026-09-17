@@ -1,0 +1,47 @@
+# Disposable demonstration credentials only. Override via .env for any shared environment.
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: Developer
+      MSSQL_SA_PASSWORD: "${DB_SA_PASSWORD:-NovaWallet.Demo.SA!2026}"
+      MSSQL_MEMORY_LIMIT_MB: "2048"
+    volumes:
+      - sql-data:/var/opt/mssql
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -Q \"SELECT 1\" -b -o /dev/null"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+
+  migrate:
+    build: .
+    image: novawallet-api:local
+    command: ["--migrate"]
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__Bootstrap: "Server=sqlserver;Database=NovaWallet;User Id=sa;Password=${DB_SA_PASSWORD:-NovaWallet.Demo.SA!2026};Encrypt=true;TrustServerCertificate=true"
+      Database__RuntimePassword: "${DB_API_PASSWORD:-NovaWallet.Demo.API!2026}"
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    build: .
+    image: novawallet-api:local
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_HTTP_PORTS: "8080"
+      ConnectionStrings__Ledger: "Server=sqlserver;Database=NovaWallet;User Id=novawallet_api;Password=${DB_API_PASSWORD:-NovaWallet.Demo.API!2026};Encrypt=true;TrustServerCertificate=true"
+      Jwt__SigningKey: "${JWT_SIGNING_KEY:-NovaWallet.Demo.Signing.Key.Only.2026!}"
+    ports:
+      - "127.0.0.1:8080:8080"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+volumes:
+  sql-data:

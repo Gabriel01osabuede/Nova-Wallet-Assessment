@@ -1,0 +1,11 @@
+**/bin/
+**/obj/
+**/TestResults/
+.vs/
+.idea/
+.env
+*.user
+*.suo
+.kilo/
+Agent.md
+Doc1_TakeHome_Backend_DotNet.pdf
